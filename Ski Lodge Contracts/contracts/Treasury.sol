@@ -44,17 +44,17 @@ contract Treasury is ContractGuard {
     address[] public excludedFromTotalSupply;
 
     // core components
-    address public tomb;
-    address public tbond;
-    address public tshare;
+    address public Ski;
+    address public SkiBond;
+    address public SkiShare;
 
     address public masonry;
     address public bondTreasury;
-    address public tombOracle;
+    address public SkiOracle;
 
     // price
-    uint256 public tombPriceOne;
-    uint256 public tombPriceCeiling;
+    uint256 public SkiPriceOne;
+    uint256 public SkiPriceCeiling;
 
     uint256 public seigniorageSaved;
 
@@ -69,18 +69,18 @@ contract Treasury is ContractGuard {
 
     uint256 public bondSupplyExpansionPercent;
 
-    // 28 first epochs (1 week) with 4.5% expansion regardless of TOMB price
+    // 28 first epochs (1 week) with 4.5% expansion regardless of Ski price
     uint256 public bootstrapEpochs;
     uint256 public bootstrapSupplyExpansionPercent;
 
     /* =================== Added variables =================== */
-    uint256 public previousEpochTombPrice;
+    uint256 public previousEpochSkiPrice;
     uint256 public maxDiscountRate; // when purchasing bond
     uint256 public maxPremiumRate; // when redeeming bond
     uint256 public discountPercent;
     uint256 public premiumThreshold;
     uint256 public premiumPercent;
-    uint256 public mintingFactorForPayingDebt; // print extra TOMB during debt phase
+    uint256 public mintingFactorForPayingDebt; // print extra Ski during debt phase
 
     address public daoFund;
     uint256 public daoFundSharedPercent;
@@ -92,8 +92,8 @@ contract Treasury is ContractGuard {
 
     event Initialized(address indexed executor, uint256 at);
     event BurnedBonds(address indexed from, uint256 bondAmount);
-    event RedeemedBonds(address indexed from, uint256 tombAmount, uint256 bondAmount);
-    event BoughtBonds(address indexed from, uint256 tombAmount, uint256 bondAmount);
+    event RedeemedBonds(address indexed from, uint256 SkiAmount, uint256 bondAmount);
+    event BoughSkiBonds(address indexed from, uint256 SkiAmount, uint256 bondAmount);
     event TreasuryFunded(uint256 timestamp, uint256 seigniorage);
     event MasonryFunded(uint256 timestamp, uint256 seigniorage);
     event DaoFundFunded(uint256 timestamp, uint256 seigniorage);
@@ -118,14 +118,14 @@ contract Treasury is ContractGuard {
         _;
 
         epoch = epoch.add(1);
-        epochSupplyContractionLeft = (getTombPrice() > tombPriceCeiling) ? 0 : getTombCirculatingSupply().mul(maxSupplyContractionPercent).div(10000);
+        epochSupplyContractionLeft = (getSkiPrice() > SkiPriceCeiling) ? 0 : getSkiCirculatingSupply().mul(maxSupplyContractionPercent).div(10000);
     }
 
     modifier checkOperator {
         require(
-            IBasisAsset(tomb).operator() == address(this) &&
-                IBasisAsset(tbond).operator() == address(this) &&
-                IBasisAsset(tshare).operator() == address(this) &&
+            IBasisAsset(Ski).operator() == address(this) &&
+                IBasisAsset(SkiBond).operator() == address(this) &&
+                IBasisAsset(SkiShare).operator() == address(this) &&
                 Operator(masonry).operator() == address(this),
             "Treasury: need more permission"
         );
@@ -151,19 +151,19 @@ contract Treasury is ContractGuard {
     }
 
     // oracle
-    function getTombPrice() public view returns (uint256 tombPrice) {
-        try IOracle(tombOracle).consult(tomb, 1e18) returns (uint144 price) {
+    function getSkiPrice() public view returns (uint256 SkiPrice) {
+        try IOracle(SkiOracle).consult(Ski, 1e18) returns (uint144 price) {
             return uint256(price);
         } catch {
-            revert("Treasury: failed to consult TOMB price from the oracle");
+            revert("Treasury: failed to consult Ski price from the oracle");
         }
     }
 
-    function getTombUpdatedPrice() public view returns (uint256 _tombPrice) {
-        try IOracle(tombOracle).twap(tomb, 1e18) returns (uint144 price) {
+    function getSkiUpdatedPrice() public view returns (uint256 _SkiPrice) {
+        try IOracle(SkiOracle).twap(Ski, 1e18) returns (uint144 price) {
             return uint256(price);
         } catch {
-            revert("Treasury: failed to consult TOMB price from the oracle");
+            revert("Treasury: failed to consult Ski price from the oracle");
         }
     }
 
@@ -172,41 +172,41 @@ contract Treasury is ContractGuard {
         return seigniorageSaved;
     }
 
-    function getBurnableTombLeft() public view returns (uint256 _burnableTombLeft) {
-        uint256 _tombPrice = getTombPrice();
-        if (_tombPrice <= tombPriceOne) {
-            uint256 _tombSupply = getTombCirculatingSupply();
-            uint256 _bondMaxSupply = _tombSupply.mul(maxDebtRatioPercent).div(10000);
-            uint256 _bondSupply = IERC20(tbond).totalSupply();
+    function getBurnableSkiLeft() public view returns (uint256 _burnableSkiLeft) {
+        uint256 _SkiPrice = getSkiPrice();
+        if (_SkiPrice <= SkiPriceOne) {
+            uint256 _SkiSupply = getSkiCirculatingSupply();
+            uint256 _bondMaxSupply = _SkiSupply.mul(maxDebtRatioPercent).div(10000);
+            uint256 _bondSupply = IERC20(SkiBond).totalSupply();
             if (_bondMaxSupply > _bondSupply) {
                 uint256 _maxMintableBond = _bondMaxSupply.sub(_bondSupply);
-                uint256 _maxBurnableTomb = _maxMintableBond.mul(_tombPrice).div(1e18);
-                _burnableTombLeft = Math.min(epochSupplyContractionLeft, _maxBurnableTomb);
+                uint256 _maxBurnableSki = _maxMintableBond.mul(_SkiPrice).div(1e18);
+                _burnableSkiLeft = Math.min(epochSupplyContractionLeft, _maxBurnableSki);
             }
         }
     }
 
     function getRedeemableBonds() public view returns (uint256 _redeemableBonds) {
-        uint256 _tombPrice = getTombPrice();
-        if (_tombPrice > tombPriceCeiling) {
-            uint256 _totalTomb = IERC20(tomb).balanceOf(address(this));
-            uint256 _rate = getBondPremiumRate();
+        uint256 _SkiPrice = getSkiPrice();
+        if (_SkiPrice > SkiPriceCeiling) {
+            uint256 _totalSki = IERC20(Ski).balanceOf(address(this));
+            uint256 _rate = geSkiBondPremiumRate();
             if (_rate > 0) {
-                _redeemableBonds = _totalTomb.mul(1e18).div(_rate);
+                _redeemableBonds = _totalSki.mul(1e18).div(_rate);
             }
         }
     }
 
-    function getBondDiscountRate() public view returns (uint256 _rate) {
-        uint256 _tombPrice = getTombPrice();
-        if (_tombPrice <= tombPriceOne) {
+    function geSkiBondDiscountRate() public view returns (uint256 _rate) {
+        uint256 _SkiPrice = getSkiPrice();
+        if (_SkiPrice <= SkiPriceOne) {
             if (discountPercent == 0) {
                 // no discount
-                _rate = tombPriceOne;
+                _rate = SkiPriceOne;
             } else {
-                uint256 _bondAmount = tombPriceOne.mul(1e18).div(_tombPrice); // to burn 1 TOMB
-                uint256 _discountAmount = _bondAmount.sub(tombPriceOne).mul(discountPercent).div(10000);
-                _rate = tombPriceOne.add(_discountAmount);
+                uint256 _bondAmount = SkiPriceOne.mul(1e18).div(_SkiPrice); // to burn 1 Ski
+                uint256 _discountAmount = _bondAmount.sub(SkiPriceOne).mul(discountPercent).div(10000);
+                _rate = SkiPriceOne.add(_discountAmount);
                 if (maxDiscountRate > 0 && _rate > maxDiscountRate) {
                     _rate = maxDiscountRate;
                 }
@@ -214,20 +214,20 @@ contract Treasury is ContractGuard {
         }
     }
 
-    function getBondPremiumRate() public view returns (uint256 _rate) {
-        uint256 _tombPrice = getTombPrice();
-        if (_tombPrice > tombPriceCeiling) {
-            uint256 _tombPricePremiumThreshold = tombPriceOne.mul(premiumThreshold).div(100);
-            if (_tombPrice >= _tombPricePremiumThreshold) {
+    function geSkiBondPremiumRate() public view returns (uint256 _rate) {
+        uint256 _SkiPrice = getSkiPrice();
+        if (_SkiPrice > SkiPriceCeiling) {
+            uint256 _SkiPricePremiumThreshold = SkiPriceOne.mul(premiumThreshold).div(100);
+            if (_SkiPrice >= _SkiPricePremiumThreshold) {
                 //Price > 1.10
-                uint256 _premiumAmount = _tombPrice.sub(tombPriceOne).mul(premiumPercent).div(10000);
-                _rate = tombPriceOne.add(_premiumAmount);
+                uint256 _premiumAmount = _SkiPrice.sub(SkiPriceOne).mul(premiumPercent).div(10000);
+                _rate = SkiPriceOne.add(_premiumAmount);
                 if (maxPremiumRate > 0 && _rate > maxPremiumRate) {
                     _rate = maxPremiumRate;
                 }
             } else {
                 // no premium bonus
-                _rate = tombPriceOne;
+                _rate = SkiPriceOne;
             }
         }
     }
@@ -235,25 +235,25 @@ contract Treasury is ContractGuard {
     /* ========== GOVERNANCE ========== */
 
     function initialize(
-        address _tomb,
-        address _tbond,
-        address _tshare,
-        address _tombOracle,
+        address _Ski,
+        address _SkiBond,
+        address _SkiShare,
+        address _SkiOracle,
         address _masonry,
         address _genesisPool,
         address _bondTreasury,
         uint256 _startTime
     ) public notInitialized {
-        tomb = _tomb;
-        tbond = _tbond;
-        tshare = _tshare;
-        tombOracle = _tombOracle;
+        Ski = _Ski;
+        SkiBond = _SkiBond;
+        SkiShare = _SkiShare;
+        SkiOracle = _SkiOracle;
         masonry = _masonry;
         bondTreasury = _bondTreasury;
         startTime = _startTime;
 
-        tombPriceOne = 10**18;
-        tombPriceCeiling = tombPriceOne.mul(101).div(100);
+        SkiPriceOne = 10**18;
+        SkiPriceCeiling = SkiPriceOne.mul(101).div(100);
 
         // exclude contracts from total supply
         excludedFromTotalSupply.push(_genesisPool);
@@ -267,8 +267,8 @@ contract Treasury is ContractGuard {
 
         bondDepletionFloorPercent = 10000; // 100% of Bond supply for depletion floor
         seigniorageExpansionFloorPercent = 3500; // At least 35% of expansion reserved for masonry
-        maxSupplyContractionPercent = 300; // Upto 3.0% supply for contraction (to burn TOMB and mint tBOND)
-        maxDebtRatioPercent = 3500; // Upto 35% supply of tBOND to purchase
+        maxSupplyContractionPercent = 300; // Upto 3.0% supply for contraction (to burn Ski and mint SkiBond)
+        maxDebtRatioPercent = 3500; // Upto 35% supply of SkiBond to purchase
 
         bondSupplyExpansionPercent = 500; // maximum 5% emissions per epoch for POL bonds
 
@@ -280,7 +280,7 @@ contract Treasury is ContractGuard {
         bootstrapSupplyExpansionPercent = 500;
 
         // set seigniorageSaved to it's balance
-        seigniorageSaved = IERC20(tomb).balanceOf(address(this));
+        seigniorageSaved = IERC20(Ski).balanceOf(address(this));
 
         initialized = true;
         operator = msg.sender;
@@ -295,17 +295,17 @@ contract Treasury is ContractGuard {
         masonry = _masonry;
     }
 
-    function setBondTreasury(address _bondTreasury) external onlyOperator {
+    function seSkiBondTreasury(address _bondTreasury) external onlyOperator {
         bondTreasury = _bondTreasury;
     }
 
-    function setTombOracle(address _tombOracle) external onlyOperator {
-        tombOracle = _tombOracle;
+    function setSkiOracle(address _SkiOracle) external onlyOperator {
+        SkiOracle = _SkiOracle;
     }
 
-    function setTombPriceCeiling(uint256 _tombPriceCeiling) external onlyOperator {
-        require(_tombPriceCeiling >= tombPriceOne && _tombPriceCeiling <= tombPriceOne.mul(120).div(100), "out of range"); // [$1.0, $1.2]
-        tombPriceCeiling = _tombPriceCeiling;
+    function setSkiPriceCeiling(uint256 _SkiPriceCeiling) external onlyOperator {
+        require(_SkiPriceCeiling >= SkiPriceOne && _SkiPriceCeiling <= SkiPriceOne.mul(120).div(100), "out of range"); // [$1.0, $1.2]
+        SkiPriceCeiling = _SkiPriceCeiling;
     }
 
     function setMaxSupplyExpansionPercents(uint256 _maxSupplyExpansionPercent) external onlyOperator {
@@ -334,7 +334,7 @@ contract Treasury is ContractGuard {
         return true;
     }
 
-    function setBondDepletionFloorPercent(uint256 _bondDepletionFloorPercent) external onlyOperator {
+    function seSkiBondDepletionFloorPercent(uint256 _bondDepletionFloorPercent) external onlyOperator {
         require(_bondDepletionFloorPercent >= 500 && _bondDepletionFloorPercent <= 10000, "out of range"); // [5%, 100%]
         bondDepletionFloorPercent = _bondDepletionFloorPercent;
     }
@@ -386,7 +386,7 @@ contract Treasury is ContractGuard {
     }
 
     function setPremiumThreshold(uint256 _premiumThreshold) external onlyOperator {
-        require(_premiumThreshold >= tombPriceCeiling, "_premiumThreshold exceeds tombPriceCeiling");
+        require(_premiumThreshold >= SkiPriceCeiling, "_premiumThreshold exceeds SkiPriceCeiling");
         require(_premiumThreshold <= 150, "_premiumThreshold is higher than 1.5");
         premiumThreshold = _premiumThreshold;
     }
@@ -401,119 +401,119 @@ contract Treasury is ContractGuard {
         mintingFactorForPayingDebt = _mintingFactorForPayingDebt;
     }
 
-    function setBondSupplyExpansionPercent(uint256 _bondSupplyExpansionPercent) external onlyOperator {
+    function seSkiBondSupplyExpansionPercent(uint256 _bondSupplyExpansionPercent) external onlyOperator {
         bondSupplyExpansionPercent = _bondSupplyExpansionPercent;
     }
 
     /* ========== MUTABLE FUNCTIONS ========== */
 
-    function _updateTombPrice() internal {
-        try IOracle(tombOracle).update() {} catch {}
+    function _updateSkiPrice() internal {
+        try IOracle(SkiOracle).update() {} catch {}
     }
 
-    function getTombCirculatingSupply() public view returns (uint256) {
-        IERC20 tombErc20 = IERC20(tomb);
-        uint256 totalSupply = tombErc20.totalSupply();
+    function getSkiCirculatingSupply() public view returns (uint256) {
+        IERC20 SkiErc20 = IERC20(Ski);
+        uint256 totalSupply = SkiErc20.totalSupply();
         uint256 balanceExcluded = 0;
         for (uint8 entryId = 0; entryId < excludedFromTotalSupply.length; ++entryId) {
-            balanceExcluded = balanceExcluded.add(tombErc20.balanceOf(excludedFromTotalSupply[entryId]));
+            balanceExcluded = balanceExcluded.add(SkiErc20.balanceOf(excludedFromTotalSupply[entryId]));
         }
         return totalSupply.sub(balanceExcluded);
     }
 
-    function buyBonds(uint256 _tombAmount, uint256 targetPrice) external onlyOneBlock checkCondition checkOperator {
-        require(_tombAmount > 0, "Treasury: cannot purchase bonds with zero amount");
+    function buyBonds(uint256 _SkiAmount, uint256 targetPrice) external onlyOneBlock checkCondition checkOperator {
+        require(_SkiAmount > 0, "Treasury: cannot purchase bonds with zero amount");
 
-        uint256 tombPrice = getTombPrice();
-        require(tombPrice == targetPrice, "Treasury: TOMB price moved");
+        uint256 SkiPrice = getSkiPrice();
+        require(SkiPrice == targetPrice, "Treasury: Ski price moved");
         require(
-            tombPrice < tombPriceOne, // price < $1
-            "Treasury: tombPrice not eligible for bond purchase"
+            SkiPrice < SkiPriceOne, // price < $1
+            "Treasury: SkiPrice not eligible for bond purchase"
         );
 
-        require(_tombAmount <= epochSupplyContractionLeft, "Treasury: not enough bond left to purchase");
+        require(_SkiAmount <= epochSupplyContractionLeft, "Treasury: not enough bond left to purchase");
 
-        uint256 _rate = getBondDiscountRate();
+        uint256 _rate = geSkiBondDiscountRate();
         require(_rate > 0, "Treasury: invalid bond rate");
 
-        uint256 _bondAmount = _tombAmount.mul(_rate).div(1e18);
-        uint256 tombSupply = getTombCirculatingSupply();
-        uint256 newBondSupply = IERC20(tbond).totalSupply().add(_bondAmount);
-        require(newBondSupply <= tombSupply.mul(maxDebtRatioPercent).div(10000), "over max debt ratio");
+        uint256 _bondAmount = _SkiAmount.mul(_rate).div(1e18);
+        uint256 SkiSupply = getSkiCirculatingSupply();
+        uint256 newBondSupply = IERC20(SkiBond).totalSupply().add(_bondAmount);
+        require(newBondSupply <= SkiSupply.mul(maxDebtRatioPercent).div(10000), "over max debt ratio");
 
-        IBasisAsset(tomb).burnFrom(msg.sender, _tombAmount);
-        IBasisAsset(tbond).mint(msg.sender, _bondAmount);
+        IBasisAsset(Ski).burnFrom(msg.sender, _SkiAmount);
+        IBasisAsset(SkiBond).mint(msg.sender, _bondAmount);
 
-        epochSupplyContractionLeft = epochSupplyContractionLeft.sub(_tombAmount);
-        _updateTombPrice();
+        epochSupplyContractionLeft = epochSupplyContractionLeft.sub(_SkiAmount);
+        _updateSkiPrice();
 
-        emit BoughtBonds(msg.sender, _tombAmount, _bondAmount);
+        emit BoughSkiBonds(msg.sender, _SkiAmount, _bondAmount);
     }
 
     function redeemBonds(uint256 _bondAmount, uint256 targetPrice) external onlyOneBlock checkCondition checkOperator {
         require(_bondAmount > 0, "Treasury: cannot redeem bonds with zero amount");
 
-        uint256 tombPrice = getTombPrice();
-        require(tombPrice == targetPrice, "Treasury: TOMB price moved");
+        uint256 SkiPrice = getSkiPrice();
+        require(SkiPrice == targetPrice, "Treasury: Ski price moved");
         require(
-            tombPrice > tombPriceCeiling, // price > $1.01
-            "Treasury: tombPrice not eligible for bond purchase"
+            SkiPrice > SkiPriceCeiling, // price > $1.01
+            "Treasury: SkiPrice not eligible for bond purchase"
         );
 
-        uint256 _rate = getBondPremiumRate();
+        uint256 _rate = geSkiBondPremiumRate();
         require(_rate > 0, "Treasury: invalid bond rate");
 
-        uint256 _tombAmount = _bondAmount.mul(_rate).div(1e18);
-        require(IERC20(tomb).balanceOf(address(this)) >= _tombAmount, "Treasury: treasury has no more budget");
+        uint256 _SkiAmount = _bondAmount.mul(_rate).div(1e18);
+        require(IERC20(Ski).balanceOf(address(this)) >= _SkiAmount, "Treasury: treasury has no more budget");
 
-        seigniorageSaved = seigniorageSaved.sub(Math.min(seigniorageSaved, _tombAmount));
+        seigniorageSaved = seigniorageSaved.sub(Math.min(seigniorageSaved, _SkiAmount));
 
-        IBasisAsset(tbond).burnFrom(msg.sender, _bondAmount);
-        IERC20(tomb).safeTransfer(msg.sender, _tombAmount);
+        IBasisAsset(SkiBond).burnFrom(msg.sender, _bondAmount);
+        IERC20(Ski).safeTransfer(msg.sender, _SkiAmount);
 
-        _updateTombPrice();
+        _updateSkiPrice();
 
-        emit RedeemedBonds(msg.sender, _tombAmount, _bondAmount);
+        emit RedeemedBonds(msg.sender, _SkiAmount, _bondAmount);
     }
 
     function _sendToMasonry(uint256 _amount) internal {
-        IBasisAsset(tomb).mint(address(this), _amount);
+        IBasisAsset(Ski).mint(address(this), _amount);
 
         uint256 _daoFundSharedAmount = 0;
         if (daoFundSharedPercent > 0) {
             _daoFundSharedAmount = _amount.mul(daoFundSharedPercent).div(10000);
-            IERC20(tomb).transfer(daoFund, _daoFundSharedAmount);
+            IERC20(Ski).transfer(daoFund, _daoFundSharedAmount);
             emit DaoFundFunded(now, _daoFundSharedAmount);
         }
 
         uint256 _devFundSharedAmount = 0;
         if (devFundSharedPercent > 0) {
             _devFundSharedAmount = _amount.mul(devFundSharedPercent).div(10000);
-            IERC20(tomb).transfer(devFund, _devFundSharedAmount);
+            IERC20(Ski).transfer(devFund, _devFundSharedAmount);
             emit DevFundFunded(now, _devFundSharedAmount);
         }
 
         _amount = _amount.sub(_daoFundSharedAmount).sub(_devFundSharedAmount);
 
-        IERC20(tomb).safeApprove(masonry, 0);
-        IERC20(tomb).safeApprove(masonry, _amount);
+        IERC20(Ski).safeApprove(masonry, 0);
+        IERC20(Ski).safeApprove(masonry, _amount);
         IMasonry(masonry).allocateSeigniorage(_amount);
         emit MasonryFunded(now, _amount);
     }
 
     function _sendToBondTreasury(uint256 _amount) internal {
-        uint256 treasuryBalance = IERC20(tomb).balanceOf(bondTreasury);
+        uint256 treasuryBalance = IERC20(Ski).balanceOf(bondTreasury);
         uint256 treasuryVested = IBondTreasury(bondTreasury).totalVested();
         if (treasuryVested >= treasuryBalance) return;
         uint256 unspent = treasuryBalance.sub(treasuryVested);
         if (_amount > unspent) {
-            IBasisAsset(tomb).mint(bondTreasury, _amount.sub(unspent));
+            IBasisAsset(Ski).mint(bondTreasury, _amount.sub(unspent));
         }
     }
 
-    function _calculateMaxSupplyExpansionPercent(uint256 _tombSupply) internal returns (uint256) {
+    function _calculateMaxSupplyExpansionPercent(uint256 _SkiSupply) internal returns (uint256) {
         for (uint8 tierId = 8; tierId >= 0; --tierId) {
-            if (_tombSupply >= supplyTiers[tierId]) {
+            if (_SkiSupply >= supplyTiers[tierId]) {
                 maxSupplyExpansionPercent = maxExpansionTiers[tierId];
                 break;
             }
@@ -522,30 +522,30 @@ contract Treasury is ContractGuard {
     }
 
     function allocateSeigniorage() external onlyOneBlock checkCondition checkEpoch checkOperator {
-        _updateTombPrice();
-        previousEpochTombPrice = getTombPrice();
-        uint256 tombSupply = getTombCirculatingSupply().sub(seigniorageSaved);
-        _sendToBondTreasury(tombSupply.mul(bondSupplyExpansionPercent).div(10000));
+        _updateSkiPrice();
+        previousEpochSkiPrice = getSkiPrice();
+        uint256 SkiSupply = getSkiCirculatingSupply().sub(seigniorageSaved);
+        _sendToBondTreasury(SkiSupply.mul(bondSupplyExpansionPercent).div(10000));
         if (epoch < bootstrapEpochs) {
             // 28 first epochs with 4.5% expansion
-            _sendToMasonry(tombSupply.mul(bootstrapSupplyExpansionPercent).div(10000));
+            _sendToMasonry(SkiSupply.mul(bootstrapSupplyExpansionPercent).div(10000));
         } else {
-            if (previousEpochTombPrice > tombPriceCeiling) {
-                // Expansion ($TOMB Price > 1 $FTM): there is some seigniorage to be allocated
-                uint256 bondSupply = IERC20(tbond).totalSupply();
-                uint256 _percentage = previousEpochTombPrice.sub(tombPriceOne);
+            if (previousEpochSkiPrice > SkiPriceCeiling) {
+                // Expansion ($Ski Price > 1 $FTM): there is some seigniorage to be allocated
+                uint256 bondSupply = IERC20(SkiBond).totalSupply();
+                uint256 _percentage = previousEpochSkiPrice.sub(SkiPriceOne);
                 uint256 _savedForBond;
                 uint256 _savedForMasonry;
-                uint256 _mse = _calculateMaxSupplyExpansionPercent(tombSupply).mul(1e14);
+                uint256 _mse = _calculateMaxSupplyExpansionPercent(SkiSupply).mul(1e14);
                 if (_percentage > _mse) {
                     _percentage = _mse;
                 }
                 if (seigniorageSaved >= bondSupply.mul(bondDepletionFloorPercent).div(10000)) {
                     // saved enough to pay debt, mint as usual rate
-                    _savedForMasonry = tombSupply.mul(_percentage).div(1e18);
+                    _savedForMasonry = SkiSupply.mul(_percentage).div(1e18);
                 } else {
                     // have not saved enough to pay debt, mint more
-                    uint256 _seigniorage = tombSupply.mul(_percentage).div(1e18);
+                    uint256 _seigniorage = SkiSupply.mul(_percentage).div(1e18);
                     _savedForMasonry = _seigniorage.mul(seigniorageExpansionFloorPercent).div(10000);
                     _savedForBond = _seigniorage.sub(_savedForMasonry);
                     if (mintingFactorForPayingDebt > 0) {
@@ -557,7 +557,7 @@ contract Treasury is ContractGuard {
                 }
                 if (_savedForBond > 0) {
                     seigniorageSaved = seigniorageSaved.add(_savedForBond);
-                    IBasisAsset(tomb).mint(address(this), _savedForBond);
+                    IBasisAsset(Ski).mint(address(this), _savedForBond);
                     emit TreasuryFunded(now, _savedForBond);
                 }
             }
@@ -570,9 +570,9 @@ contract Treasury is ContractGuard {
         address _to
     ) external onlyOperator {
         // do not allow to drain core tokens
-        require(address(_token) != address(tomb), "tomb");
-        require(address(_token) != address(tbond), "bond");
-        require(address(_token) != address(tshare), "share");
+        require(address(_token) != address(Ski), "Ski");
+        require(address(_token) != address(SkiBond), "bond");
+        require(address(_token) != address(SkiShare), "share");
         _token.safeTransfer(_to, _amount);
     }
 

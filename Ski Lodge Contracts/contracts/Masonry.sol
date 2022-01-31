@@ -68,7 +68,7 @@ contract Masonry is ShareWrapper, ContractGuard {
     // flags
     bool public initialized = false;
 
-    IERC20 public tomb;
+    IERC20 public Ski;
     ITreasury public treasury;
 
     mapping(address => Masonseat) public masons;
@@ -115,11 +115,11 @@ contract Masonry is ShareWrapper, ContractGuard {
     /* ========== GOVERNANCE ========== */
 
     function initialize(
-        IERC20 _tomb,
+        IERC20 _Ski,
         IERC20 _share,
         ITreasury _treasury
     ) public notInitialized {
-        tomb = _tomb;
+        Ski = _Ski;
         share = _share;
         treasury = _treasury;
 
@@ -180,8 +180,8 @@ contract Masonry is ShareWrapper, ContractGuard {
         return treasury.nextEpochPoint();
     }
 
-    function getTombPrice() external view returns (uint256) {
-        return treasury.getTombPrice();
+    function getSkiPrice() external view returns (uint256) {
+        return treasury.getSkiPrice();
     }
 
     // =========== Mason getters
@@ -224,7 +224,7 @@ contract Masonry is ShareWrapper, ContractGuard {
             require(masons[msg.sender].epochTimerStart.add(rewardLockupEpochs) <= treasury.epoch(), "Masonry: still in reward lockup");
             masons[msg.sender].epochTimerStart = treasury.epoch(); // reset timer
             masons[msg.sender].rewardEarned = 0;
-            tomb.safeTransfer(msg.sender, reward);
+            Ski.safeTransfer(msg.sender, reward);
             emit RewardPaid(msg.sender, reward);
         }
     }
@@ -244,13 +244,13 @@ contract Masonry is ShareWrapper, ContractGuard {
         });
         masonryHistory.push(newSnapshot);
 
-        tomb.safeTransferFrom(msg.sender, address(this), amount);
+        Ski.safeTransferFrom(msg.sender, address(this), amount);
         emit RewardAdded(msg.sender, amount);
     }
 
     function governanceRecoverUnsupported(IERC20 _token, uint256 _amount, address _to) external onlyOperator {
         // do not allow to drain core tokens
-        require(address(_token) != address(tomb), "tomb");
+        require(address(_token) != address(Ski), "Ski");
         require(address(_token) != address(share), "share");
         _token.safeTransfer(_to, _amount);
     }

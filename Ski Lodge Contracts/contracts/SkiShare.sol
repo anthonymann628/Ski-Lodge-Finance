@@ -7,10 +7,10 @@ import "@openzeppelin/contracts/token/ERC20/ERC20Burnable.sol";
 
 import "./owner/Operator.sol";
 
-contract TShare is ERC20Burnable, Operator {
+contract SkiShare is ERC20Burnable, Operator {
     using SafeMath for uint256;
 
-    // TOTAL MAX SUPPLY = 70,000 tSHAREs
+    // TOTAL MAX SUPPLY = 70,000 SkiShares
     uint256 public constant FARMING_POOL_REWARD_ALLOCATION = 60000 ether;
     uint256 public constant COMMUNITY_FUND_POOL_ALLOCATION = 0 ether;
     uint256 public constant DEV_FUND_POOL_ALLOCATION = 5000 ether;
@@ -30,7 +30,7 @@ contract TShare is ERC20Burnable, Operator {
 
     bool public rewardPoolDistributed = false;
 
-    constructor(uint256 _startTime, address _communityFund, address _devFund) public ERC20("3SHARES", "3SHARE Token") {
+    constructor(uint256 _startTime, address _communityFund, address _devFund) public ERC20("SKISHARES", "SKISHARE Token") {
         _mint(msg.sender, 1 ether); // mint 1 TOMB Share for initial pools deployment
 
         startTime = _startTime;

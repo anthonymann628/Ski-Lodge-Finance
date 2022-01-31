@@ -6,9 +6,9 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 
-// Note that this pool has no minter key of TOMB (rewards).
-// Instead, the governance will call TOMB distributeReward method and send reward to this pool at the beginning.
-contract TombGenesisRewardPool {
+// Note that this pool has no minter key of Ski (rewards).
+// Instead, the governance will call Ski distributeReward method and send reward to this pool at the beginning.
+contract SkiGenesisRewardPool {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
@@ -24,13 +24,13 @@ contract TombGenesisRewardPool {
     // Info of each pool.
     struct PoolInfo {
         IERC20 token; // Address of LP token contract.
-        uint256 allocPoint; // How many allocation points assigned to this pool. TOMB to distribute.
-        uint256 lastRewardTime; // Last time that TOMB distribution occurs.
-        uint256 accTombPerShare; // Accumulated TOMB per share, times 1e18. See below.
+        uint256 allocPoint; // How many allocation points assigned to this pool. Ski to distribute.
+        uint256 lastRewardTime; // Last time that Ski distribution occurs.
+        uint256 accSkiPerShare; // Accumulated Ski per share, times 1e18. See below.
         bool isStarted; // if lastRewardBlock has passed
     }
 
-    IERC20 public tomb;
+    IERC20 public Ski;
     address public shiba;
 
     // Info of each pool.
@@ -42,14 +42,14 @@ contract TombGenesisRewardPool {
     // Total allocation points. Must be the sum of all allocation points in all pools.
     uint256 public totalAllocPoint = 0;
 
-    // The time when TOMB mining starts.
+    // The time when Ski mining starts.
     uint256 public poolStartTime;
 
-    // The time when TOMB mining ends.
+    // The time when Ski mining ends.
     uint256 public poolEndTime;
 
     // MAINNET
-    uint256 public tombPerSecond = 0.09645 ether; // 25000 TOMB / (72h * 60min * 60s)
+    uint256 public SkiPerSecond = 0.09645 ether; // 25000 Ski / (72h * 60min * 60s)
     uint256 public runningTime = 3 days; // 1 days
     uint256 public constant TOTAL_REWARDS = 25000 ether;
     // END MAINNET
@@ -60,12 +60,12 @@ contract TombGenesisRewardPool {
     event RewardPaid(address indexed user, uint256 amount);
 
     constructor(
-        address _tomb,
+        address _Ski,
         address _shiba,
         uint256 _poolStartTime
     ) public {
         require(block.timestamp < _poolStartTime, "late");
-        if (_tomb != address(0)) tomb = IERC20(_tomb);
+        if (_Ski != address(0)) Ski = IERC20(_Ski);
         if (_shiba != address(0)) shiba = _shiba;
         poolStartTime = _poolStartTime;
         poolEndTime = poolStartTime + runningTime;
@@ -73,14 +73,14 @@ contract TombGenesisRewardPool {
     }
 
     modifier onlyOperator() {
-        require(operator == msg.sender, "TombGenesisPool: caller is not the operator");
+        require(operator == msg.sender, "SkiGenesisPool: caller is not the operator");
         _;
     }
 
     function checkPoolDuplicate(IERC20 _token) internal view {
         uint256 length = poolInfo.length;
         for (uint256 pid = 0; pid < length; ++pid) {
-            require(poolInfo[pid].token != _token, "TombGenesisPool: existing pool?");
+            require(poolInfo[pid].token != _token, "SkiGenesisPool: existing pool?");
         }
     }
 
@@ -117,7 +117,7 @@ contract TombGenesisRewardPool {
             token : _token,
             allocPoint : _allocPoint,
             lastRewardTime : _lastRewardTime,
-            accTombPerShare : 0,
+            accSkiPerShare : 0,
             isStarted : _isStarted
             }));
         if (_isStarted) {
@@ -125,7 +125,7 @@ contract TombGenesisRewardPool {
         }
     }
 
-    // Update the given pool's TOMB allocation point. Can only be called by the owner.
+    // Update the given pool's Ski allocation point. Can only be called by the owner.
     function set(uint256 _pid, uint256 _allocPoint) public onlyOperator {
         massUpdatePools();
         PoolInfo storage pool = poolInfo[_pid];
@@ -142,27 +142,27 @@ contract TombGenesisRewardPool {
         if (_fromTime >= _toTime) return 0;
         if (_toTime >= poolEndTime) {
             if (_fromTime >= poolEndTime) return 0;
-            if (_fromTime <= poolStartTime) return poolEndTime.sub(poolStartTime).mul(tombPerSecond);
-            return poolEndTime.sub(_fromTime).mul(tombPerSecond);
+            if (_fromTime <= poolStartTime) return poolEndTime.sub(poolStartTime).mul(SkiPerSecond);
+            return poolEndTime.sub(_fromTime).mul(SkiPerSecond);
         } else {
             if (_toTime <= poolStartTime) return 0;
-            if (_fromTime <= poolStartTime) return _toTime.sub(poolStartTime).mul(tombPerSecond);
-            return _toTime.sub(_fromTime).mul(tombPerSecond);
+            if (_fromTime <= poolStartTime) return _toTime.sub(poolStartTime).mul(SkiPerSecond);
+            return _toTime.sub(_fromTime).mul(SkiPerSecond);
         }
     }
 
-    // View function to see pending TOMB on frontend.
-    function pendingTOMB(uint256 _pid, address _user) external view returns (uint256) {
+    // View function to see pending Ski on frontend.
+    function pendingSki(uint256 _pid, address _user) external view returns (uint256) {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][_user];
-        uint256 accTombPerShare = pool.accTombPerShare;
+        uint256 accSkiPerShare = pool.accSkiPerShare;
         uint256 tokenSupply = pool.token.balanceOf(address(this));
         if (block.timestamp > pool.lastRewardTime && tokenSupply != 0) {
             uint256 _generatedReward = getGeneratedReward(pool.lastRewardTime, block.timestamp);
-            uint256 _tombReward = _generatedReward.mul(pool.allocPoint).div(totalAllocPoint);
-            accTombPerShare = accTombPerShare.add(_tombReward.mul(1e18).div(tokenSupply));
+            uint256 _SkiReward = _generatedReward.mul(pool.allocPoint).div(totalAllocPoint);
+            accSkiPerShare = accSkiPerShare.add(_SkiReward.mul(1e18).div(tokenSupply));
         }
-        return user.amount.mul(accTombPerShare).div(1e18).sub(user.rewardDebt);
+        return user.amount.mul(accSkiPerShare).div(1e18).sub(user.rewardDebt);
     }
 
     // Update reward variables for all pools. Be careful of gas spending!
@@ -190,8 +190,8 @@ contract TombGenesisRewardPool {
         }
         if (totalAllocPoint > 0) {
             uint256 _generatedReward = getGeneratedReward(pool.lastRewardTime, block.timestamp);
-            uint256 _tombReward = _generatedReward.mul(pool.allocPoint).div(totalAllocPoint);
-            pool.accTombPerShare = pool.accTombPerShare.add(_tombReward.mul(1e18).div(tokenSupply));
+            uint256 _SkiReward = _generatedReward.mul(pool.allocPoint).div(totalAllocPoint);
+            pool.accSkiPerShare = pool.accSkiPerShare.add(_SkiReward.mul(1e18).div(tokenSupply));
         }
         pool.lastRewardTime = block.timestamp;
     }
@@ -203,9 +203,9 @@ contract TombGenesisRewardPool {
         UserInfo storage user = userInfo[_pid][_sender];
         updatePool(_pid);
         if (user.amount > 0) {
-            uint256 _pending = user.amount.mul(pool.accTombPerShare).div(1e18).sub(user.rewardDebt);
+            uint256 _pending = user.amount.mul(pool.accSkiPerShare).div(1e18).sub(user.rewardDebt);
             if (_pending > 0) {
-                safeTombTransfer(_sender, _pending);
+                safeSkiTransfer(_sender, _pending);
                 emit RewardPaid(_sender, _pending);
             }
         }
@@ -217,7 +217,7 @@ contract TombGenesisRewardPool {
                 user.amount = user.amount.add(_amount);
             }
         }
-        user.rewardDebt = user.amount.mul(pool.accTombPerShare).div(1e18);
+        user.rewardDebt = user.amount.mul(pool.accSkiPerShare).div(1e18);
         emit Deposit(_sender, _pid, _amount);
     }
 
@@ -228,16 +228,16 @@ contract TombGenesisRewardPool {
         UserInfo storage user = userInfo[_pid][_sender];
         require(user.amount >= _amount, "withdraw: not good");
         updatePool(_pid);
-        uint256 _pending = user.amount.mul(pool.accTombPerShare).div(1e18).sub(user.rewardDebt);
+        uint256 _pending = user.amount.mul(pool.accSkiPerShare).div(1e18).sub(user.rewardDebt);
         if (_pending > 0) {
-            safeTombTransfer(_sender, _pending);
+            safeSkiTransfer(_sender, _pending);
             emit RewardPaid(_sender, _pending);
         }
         if (_amount > 0) {
             user.amount = user.amount.sub(_amount);
             pool.token.safeTransfer(_sender, _amount);
         }
-        user.rewardDebt = user.amount.mul(pool.accTombPerShare).div(1e18);
+        user.rewardDebt = user.amount.mul(pool.accSkiPerShare).div(1e18);
         emit Withdraw(_sender, _pid, _amount);
     }
 
@@ -252,14 +252,14 @@ contract TombGenesisRewardPool {
         emit EmergencyWithdraw(msg.sender, _pid, _amount);
     }
 
-    // Safe TOMB transfer function, just in case if rounding error causes pool to not have enough TOMBs.
-    function safeTombTransfer(address _to, uint256 _amount) internal {
-        uint256 _tombBalance = tomb.balanceOf(address(this));
-        if (_tombBalance > 0) {
-            if (_amount > _tombBalance) {
-                tomb.safeTransfer(_to, _tombBalance);
+    // Safe Ski transfer function, just in case if rounding error causes pool to not have enough Skis.
+    function safeSkiTransfer(address _to, uint256 _amount) internal {
+        uint256 _SkiBalance = Ski.balanceOf(address(this));
+        if (_SkiBalance > 0) {
+            if (_amount > _SkiBalance) {
+                Ski.safeTransfer(_to, _SkiBalance);
             } else {
-                tomb.safeTransfer(_to, _amount);
+                Ski.safeTransfer(_to, _amount);
             }
         }
     }
@@ -270,8 +270,8 @@ contract TombGenesisRewardPool {
 
     function governanceRecoverUnsupported(IERC20 _token, uint256 amount, address to) external onlyOperator {
         if (block.timestamp < poolEndTime + 90 days) {
-            // do not allow to drain core token (TOMB or lps) if less than 90 days after pool ends
-            require(_token != tomb, "tomb");
+            // do not allow to drain core token (Ski or lps) if less than 90 days after pool ends
+            require(_token != Ski, "Ski");
             uint256 length = poolInfo.length;
             for (uint256 pid = 0; pid < length; ++pid) {
                 PoolInfo storage pool = poolInfo[pid];
