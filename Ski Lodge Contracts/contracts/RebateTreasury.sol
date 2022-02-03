@@ -125,10 +125,10 @@ contract RebateTreasury is Ownable {
 
     // Initialize parameters
 
-    constructor(address Ski, address SkiOracle, address treasury) {
-        Ski = IERC20(Ski);
-        SkiOracle = IOracle(SkiOracle);
-        Treasury = ITreasury(treasury);
+    constructor(address _Ski, address _SkiOracle, address _treasury) {
+        Ski = IERC20(_Ski);
+        SkiOracle = IOracle(_SkiOracle);
+        Treasury = ITreasury(_treasury);
     }
     
     // Bond asset for discounted Ski at bond rate
@@ -164,8 +164,8 @@ contract RebateTreasury is Ownable {
     
     // Set Ski token
 
-    function setSki(address Ski) external onlyOwner {
-        Ski = IERC20(Ski);
+    function setSki(address _Ski) external onlyOwner {
+        Ski = IERC20(_Ski);
     }
 
     // Set Ski oracle
